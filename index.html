@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>N328 Visualization Final Project | Most Streamed Songs of 2024</title>
+    <script src="https://d3js.org/d3.v6.js"></script>
+    <style type="text/css">
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .song-label { 
+            transform: translate(-10px,0px) rotate(-30deg);
+            text-anchor: end;
+            font-size: 12px;
+            max-width: 100px;
+            overflow: hidden;
+        }
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: black;
+            shape-rendering: crispEdges;
+        }
+        .mybar {
+            fill-opacity: 0.7;
+        }
+        rect:hover {
+            fill: darkgoldenrod;
+        }
+        .youtube { fill: steelblue; }
+        .spotify { fill: green; }
+        .tiktok { fill: orange; }
+        .pandora { fill: darkred; }
+        .deezer { fill: purple; }
+        .SiriusXM { fill: blue; }
+        .apple_music { fill: pink; }
+        .soundcloud { fill: darkcyan; }
+        .legend {
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            display: inline-block;
+            padding: 5px 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .legend span {
+            margin-right: 15px;
+        }
+        div.tooltip {
+            position: absolute;
+            text-align: center;
+            width: fit-content;
+            height: fit-content;
+            padding: 8px;
+            font: 12px sans-serif;
+            font-weight: bold;
+            background: lightgray;
+            border: 0px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <h2>Top 40 Songs of 2024</h2>   
+    <p>Discover the top 40 songs of the past year on the most popular streaming platforms! Use the legend at the bottom of the chart to filter
+         to a specific streaming service.</p>
+
+    <div id="legend">
+        <span class="legend youtube">YouTube</span> | 
+        <span class="legend spotify">Spotify</span> | 
+        <span class="legend tiktok">TikTok</span> |
+        <span class="legend pandora">Pandora</span> |
+        <span class="legend deezer">Deezer</span> |
+        <span class="legend SiriusXM">SiriusXM</span> |
+        <span class="legend apple_music">Apple Music</span> |
+        <span class="legend soundcloud">SoundCloud</span>
+    </div>
+    
+    <svg width="90%" height="500" id="chart"></svg>
+
+    <script>
+        function truncate(str, maxLength) {
+            if (str.length <= maxLength) {
+                return str;
+            } else {
+                return str.slice(0, maxLength - 3) + "...";
+            }
+        }
+        var maxSongTitleLength = 20
+
+        var margin = { top: 20, right: 50, bottom: 100, left: 100 },
+            width = window.document.getElementById("chart").clientWidth - 25;
+            height = (window.innerHeight * .7) - margin.top - margin.bottom;
+
+        var svg = d3.select("#chart")
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        d3.csv("most_streamed_2024.csv").then(function(data) {
+            data.forEach(function(d) {
+                d.youtube_streams = +d.youtube_streams;
+                d.spotify_streams = +d.spotify_streams;
+                d.tiktok_streams = +d.tiktok_streams;
+                d.apple_music_streams = +d.apple_music_streams;
+                d.SiriusXM_streams = +d.SiriusXM_streams;
+                d.deezer_streams = +d.deezer_streams;
+                d.pandora_streams = +d.pandora_streams;
+                d.soundcloud_streams = +d.soundcloud_streams;
+            });
+
+            function getTop40Songs(platform) {
+                return data.sort(function(a, b) {
+                    return b[platform] - a[platform];
+                }).slice(0, 40);
+            }
+
+            var top40Spotify = getTop40Songs("spotify_streams");
+            var top40YouTube = getTop40Songs("youtube_streams");
+            var top40TikTok = getTop40Songs("tiktok_streams");
+            var top40AppleMusic = getTop40Songs("apple_music_streams");
+            var top40SiriusXM = getTop40Songs("SiriusXM_streams");
+            var top40Deezer = getTop40Songs("deezer_streams");
+            var top40Pandora = getTop40Songs("pandora_streams");
+            var top40SoundCloud = getTop40Songs("soundcloud_streams");
+
+            var selectedPlatform = "spotify_streams";
+            var top40Data = getTop40Songs(selectedPlatform);
+
+            var xScale = d3.scaleBand().range([0, width - 75])
+                .domain(top40Data.map(function(d) { return truncate(d.track, maxSongTitleLength); }))
+                .padding(.1);
+
+            var yScale = d3.scaleLinear().range([height, 0])
+                .domain([0, d3.max(top40Data, function(d) { return d[selectedPlatform]; })]);         
+
+            var xAxis = svg.append("g")
+                .attr("class", "x-axis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(xScale))
+                .selectAll("text")
+                    .attr("class", "song-label")
+
+            svg.append("g")
+                .attr("class", "y axis")
+                .call(d3.axisLeft(yScale))
+                .selectAll("text")
+                .style("font-size", "12px");
+            
+            var tooltipGroup = d3.select("body").append("div")
+                .attr("class", "tooltip")
+                .style("opacity",0);
+
+            function createBars(platformData, platformClass, dataLocation) {                
+                var bars = svg.selectAll("rect." + platformClass)
+                    .data(platformData)
+                    .enter()
+                    .append("rect")
+                        .attr("x", function(d) { 
+                            return xScale(truncate(d.track, maxSongTitleLength));
+                        })
+                        .attr("y", function(d) { return yScale(d[dataLocation]); })
+                        .attr("width", xScale.bandwidth())
+                        .attr("height", function(d) { return height - yScale(d[dataLocation]); })
+                        .attr("class", platformClass)
+                        .style("visibility", "hidden");
+
+                    bars.on("mouseover", function(event, d) {
+                        tooltipGroup.transition()
+                            .duration(200)
+                            .style("opacity", 1);
+                        tooltipGroup.html(d.track + "<br/>" + d.Album + " - " + d.Artist + "<br/>" + d.release_date)
+                            .style("left", (event.pageX) + "px")
+                            .style("top", (event.pageY - 28) + "px");
+                        })
+                        .on("mouseout", function() {
+                            tooltipGroup.transition()
+                                .duration(500)
+                                .style("opacity", 0);
+                        })                        
+                        return bars;
+                    }
+
+            createBars(top40Data, selectedPlatform, selectedPlatform);
+
+            d3.selectAll(".legend").on("click", function(event) {
+                var platformClass = this.className.split(' ')[1];
+                selectedPlatform = platformClass + "_streams";
+
+                top40Data = getTop40Songs(selectedPlatform);
+
+                xScale.domain(top40Data.map(function(d) { return truncate(d.track, maxSongTitleLength); }));
+
+                svg.select(".x-axis").transition().duration(500).call(d3.axisBottom(xScale));
+
+                svg.select(".x-axis").selectAll("text").attr("class","song-label");
+
+                yScale.domain([0, d3.max(top40Data, function(d) { return d[selectedPlatform]; })]);
+
+                svg.selectAll("rect").remove();
+                createBars(top40Data, platformClass, selectedPlatform); 
+
+                svg.selectAll("rect").style("visibility", "hidden");
+                svg.selectAll("rect." + platformClass).style("visibility", "visible");
+            });
+        });
+    </script>
+</body>             
+</html> 
